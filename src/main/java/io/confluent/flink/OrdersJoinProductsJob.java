@@ -33,15 +33,10 @@ import org.apache.flink.formats.json.JsonSerializationSchema;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
-import org.apache.flink.util.Collector;
-import org.apache.flink.util.OutputTag;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 
 import java.io.InputStream;
-import java.math.BigDecimal;
 import java.util.Properties;
 
 public class OrdersJoinProductsJob {
@@ -77,29 +72,6 @@ public class OrdersJoinProductsJob {
 		DataStream<Products> productsStream = env
 				.fromSource(productsSource, WatermarkStrategy.noWatermarks(), "products-source");
 
-		final OutputTag<OrdersWithProducts> largeOrdersTag = new OutputTag<>("large-orders-tag"){};
-
-		SingleOutputStreamOperator<OrdersWithProducts> ordersWithProductsStream = ordersStream
-				.connect(productsStream)
-				.keyBy(o -> o.productId, p -> p.productId)
-				//.process(new EnrichmentJoinUsingListState());
-				.process(new EnrichmentJoinUsingMapState())
-				.process(new ProcessFunction<>() {
-
-					@Override
-					public void processElement(
-							OrdersWithProducts value,
-							Context ctx,
-							Collector<OrdersWithProducts> out) {
-
-						out.collect(value);
-
-						if (value.orderValue.compareTo(new BigDecimal("90.00")) > 0) {
-							ctx.output(largeOrdersTag, value);
-						}
-					}
-				});
-
 		Properties producerConfig = new Properties();
 		try (InputStream stream = OrdersJoinProductsJob.class.getClassLoader().getResourceAsStream("producer.properties")) {
 			producerConfig.load(stream);
@@ -119,24 +91,12 @@ public class OrdersJoinProductsJob {
 				.setTransactionalIdPrefix("OrdersJoinProducts")
 				.build();
 
-		ordersWithProductsStream.sinkTo(ordersWithProductsSink);
-
-		KafkaRecordSerializationSchema<OrdersWithProducts> largeOrdersSerializer = KafkaRecordSerializationSchema.<OrdersWithProducts>builder()
-				.setTopic("large-orders")
-				.setValueSerializationSchema(new JsonSerializationSchema<>(
-						() -> new ObjectMapper().registerModule(new JavaTimeModule())
-				))
-				.build();
-
-		KafkaSink<OrdersWithProducts> largeOrdersSink = KafkaSink.<OrdersWithProducts>builder()
-				.setKafkaProducerConfig(producerConfig)
-				.setRecordSerializer(largeOrdersSerializer)
-				.setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
-				.build();
-
-		DataStream<OrdersWithProducts> largeOrderstStream = ordersWithProductsStream.getSideOutput(largeOrdersTag);
-
-		largeOrderstStream.sinkTo(largeOrdersSink);
+		ordersStream
+				.connect(productsStream)
+				.keyBy(o -> o.productId, p -> p.productId)
+				//.process(new EnrichmentJoinUsingListState());
+				.process(new EnrichmentJoinUsingMapState())
+				.sinkTo(ordersWithProductsSink);
 
 		env.execute("OrdersJoinProductsJob");
 	}

@@ -1,6 +1,7 @@
 package io.confluent.flink;
 
 import functons.IncrementalAggregate;
+import functons.LateOrdersSideOutput;
 import models.OrdersStatistics;
 import models.OrdersWithProducts;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -8,9 +9,11 @@ import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.formats.json.JsonDeserializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.util.OutputTag;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 
 import java.io.InputStream;
@@ -35,10 +38,20 @@ public class OrdersAggregateJob {
                 .setValueOnlyDeserializer(new JsonDeserializationSchema<>(OrdersWithProducts.class))
                 .build();
 
-        DataStream<OrdersWithProducts> ordersWithProductsDataStream = env
-                .fromSource(ordersWithProductsSource, WatermarkStrategy.forMonotonousTimestamps(), "orders-with-products-source");
+        final OutputTag<OrdersWithProducts> lateOrdersTag = new OutputTag<>("late-orders-tag"){};
 
-        ordersWithProductsDataStream
+        SingleOutputStreamOperator<OrdersWithProducts> ordersWithProductsStream = env
+                .fromSource(ordersWithProductsSource, WatermarkStrategy.<OrdersWithProducts>forMonotonousTimestamps().withTimestampAssigner(
+                        (element, recordTimestamp) ->
+                                element.orderTs), "orders-with-products-source")
+                .process(new LateOrdersSideOutput(lateOrdersTag));
+
+        DataStream<OrdersWithProducts> lateOrdersStream = ordersWithProductsStream.getSideOutput(lateOrdersTag);
+
+        lateOrdersStream.print()
+                .name("late-orders-sink");
+
+        ordersWithProductsStream
                 .map(OrdersStatistics::new)
                 .keyBy(os -> os.productId)
                 .window(TumblingEventTimeWindows.of(Time.minutes(1)))
