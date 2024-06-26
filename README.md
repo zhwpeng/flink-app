@@ -17,5 +17,5 @@
 ```
 
 1. OrdersGeneratorJob.java: Use DataGenerator connector to generate mock data.
-2. OrdersJoinProductsJob.java: Join DataStream orders with products. If corresponding products are not available, orders will be buffered. We also demonstrate how to use side-output in this example.
-3. OrdersAggregateJob.java: Calculate total order values by incremental aggregation (ReduceFunction follows by ProcessWindowFunction).
+2. OrdersJoinProductsJob.java: Join DataStream orders with products. If corresponding products are not available, orders will be buffered.
+3. OrdersAggregateJob.java: Calculate total order values by incremental aggregation (ReduceFunction follows by ProcessWindowFunction). We also use side-output to capture late orders.
