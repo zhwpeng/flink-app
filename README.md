@@ -19,4 +19,4 @@
 1. OrdersGeneratorJob.java: Use DataGenerator connector to generate mock data.
 2. OrdersJoinProductsJob.java: Join orders with products. If corresponding products are not available, orders will be buffered.
 3. OrdersAggregateJob.java: Calculate total order values by incremental aggregation (ReduceFunction follows by ProcessWindowFunction). We also use side-output to capture late orders.
-4. OrdersTopJob.java: List top 3 popular product by Sliding Window and AggregateFunction and WindowFunction.
+4. OrdersTopJob.java: List top 3 popular products by Sliding Window, AggregateFunction and WindowFunction.
