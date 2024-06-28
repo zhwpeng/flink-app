@@ -22,7 +22,7 @@ public class OrdersGenerator {
     }
 
     private static BigDecimal generateOrderValue() {
-        return new BigDecimal(random.nextDouble() * 100).setScale(2, RoundingMode.HALF_EVEN);
+        return BigDecimal.valueOf(random.nextDouble() * 100).setScale(2, RoundingMode.HALF_EVEN);
     }
 
     private static Long generateOrderTs() {

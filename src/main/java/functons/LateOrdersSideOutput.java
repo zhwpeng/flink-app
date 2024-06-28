@@ -20,7 +20,7 @@ public class LateOrdersSideOutput
         long currentWatermark=ctx.timerService().currentWatermark();
         long eventTimestamp=ctx.timestamp();
 
-        if (eventTimestamp<currentWatermark) {
+        if (eventTimestamp < currentWatermark) {
             ctx.output(lateOrdersTag, value);
         } else {
             out.collect(value);

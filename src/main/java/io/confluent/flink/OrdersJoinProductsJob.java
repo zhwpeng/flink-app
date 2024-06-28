@@ -88,17 +88,22 @@ public class OrdersJoinProductsJob {
 				.setKafkaProducerConfig(producerConfig)
 				.setRecordSerializer(ordersWithProductsSerializer)
 				.setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
-				.setTransactionalIdPrefix("OrdersJoinProducts")
+				.setTransactionalIdPrefix("OrdersWithProducts")
 				.build();
 
-		ordersStream
-				.connect(productsStream)
-				.keyBy(o -> o.productId, p -> p.productId)
-				//.process(new EnrichmentJoinUsingListState());
-				.process(new EnrichmentJoinUsingMapState())
-				.sinkTo(ordersWithProductsSink);
+		defineWorkflow(ordersStream, productsStream)
+				.sinkTo(ordersWithProductsSink)
+				.name("orders-join-products-sink");
 
 		env.execute("OrdersJoinProductsJob");
+	}
+
+	public static DataStream<OrdersWithProducts> defineWorkflow(DataStream<Orders> orders, DataStream<Products> products) {
+		return orders
+				.connect(products)
+				.keyBy(o -> o.productId, p -> p.productId)
+				//.process(new EnrichmentJoinUsingListState());
+				.process(new EnrichmentJoinUsingMapState());
 	}
 
 }
